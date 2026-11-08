@@ -57,3 +57,12 @@ def test_network_error_raises_chat_error():
     )
     with pytest.raises(ChatError):
         c.complete("hello")
+
+
+def test_timeout_error_mentions_timeout():
+    err = openai.APITimeoutError(request=None)
+    c = ChatClient(
+        Config(base_url="https://x", api_key="k", model="m"), client=FakeClient(error=err)
+    )
+    with pytest.raises(ChatError, match="超时"):
+        c.complete("hello")

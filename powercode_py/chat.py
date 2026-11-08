@@ -16,11 +16,12 @@ class ChatClient:
     client 默认基于 config 构造 openai.OpenAI；测试时可注入假客户端。
     """
 
-    def __init__(self, config: Config, client=None):
+    def __init__(self, config: Config, client=None, timeout: float = 60.0):
         self.config = config
         self.client = client or OpenAI(
             base_url=config.base_url,
             api_key=config.api_key,
+            timeout=timeout,
         )
 
     def complete(self, prompt: str) -> str:
@@ -34,6 +35,8 @@ class ChatClient:
             raise ChatError(
                 f"认证失败，请检查 provider.json 里的 apiKey 是否正确：{exc}"
             ) from exc
+        except openai.APITimeoutError as exc:
+            raise ChatError(f"请求超时，请稍后重试或检查网络：{exc}") from exc
         except openai.APIConnectionError as exc:
             raise ChatError(f"网络连接失败，请检查网络或 baseURL：{exc}") from exc
         except openai.APIError as exc:
