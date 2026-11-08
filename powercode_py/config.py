@@ -44,9 +44,15 @@ def load_config(path: str | Path = "provider.json") -> Config:
         "apiKey": "api_key",
         "model": "model",
     }
-    missing = [key for key in field_map if not raw.get(key)]
-    if missing:
-        raise ConfigError(f"配置文件 {p} 缺少字段：{', '.join(missing)}")
+    invalid = [
+        key
+        for key in field_map
+        if not isinstance(raw.get(key), str) or not raw.get(key).strip()
+    ]
+    if invalid:
+        raise ConfigError(
+            f"配置文件 {p} 的字段缺失或不是非空字符串：{', '.join(invalid)}"
+        )
 
     return Config(
         base_url=raw["baseURL"].strip(),

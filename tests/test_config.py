@@ -34,3 +34,12 @@ def test_missing_field(tmp_path):
     p.write_text('{"baseURL":"x"}', encoding="utf-8")
     with pytest.raises(ConfigError):
         load_config(p)
+
+
+def test_non_string_value_raises_config_error(tmp_path):
+    p = tmp_path / "provider.json"
+    p.write_text(
+        '{"baseURL":"https://x","apiKey":"k","model":123}', encoding="utf-8"
+    )
+    with pytest.raises(ConfigError):
+        load_config(p)
