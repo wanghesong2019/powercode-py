@@ -66,3 +66,22 @@ def test_timeout_error_mentions_timeout():
     )
     with pytest.raises(ChatError, match="超时"):
         c.complete("hello")
+
+
+def test_falsy_client_is_used():
+    class FalsyClient:
+        def __bool__(self):
+            return False
+
+        @property
+        def chat(self):
+            return SimpleNamespace(
+                completions=SimpleNamespace(
+                    create=lambda **kw: _completion("from falsy")
+                )
+            )
+
+    c = ChatClient(
+        Config(base_url="https://x", api_key="k", model="m"), client=FalsyClient()
+    )
+    assert c.complete("hello") == "from falsy"

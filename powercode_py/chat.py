@@ -18,7 +18,7 @@ class ChatClient:
 
     def __init__(self, config: Config, client=None, timeout: float = 60.0):
         self.config = config
-        self.client = client or OpenAI(
+        self.client = client if client is not None else OpenAI(
             base_url=config.base_url,
             api_key=config.api_key,
             timeout=timeout,
