@@ -42,5 +42,9 @@ class ChatClient:
         except openai.APIError as exc:
             raise ChatError(f"调用模型失败：{exc}") from exc
 
-        content = completion.choices[0].message.content
-        return content or ""
+        if not completion.choices:
+            return ""
+        message = completion.choices[0].message
+        if message is None:
+            return ""
+        return message.content or ""

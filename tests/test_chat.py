@@ -85,3 +85,29 @@ def test_falsy_client_is_used():
         Config(base_url="https://x", api_key="k", model="m"), client=FalsyClient()
     )
     assert c.complete("hello") == "from falsy"
+
+
+def test_empty_choices_returns_empty():
+    client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=lambda **kw: SimpleNamespace(choices=[])
+            )
+        )
+    )
+    c = ChatClient(Config(base_url="https://x", api_key="k", model="m"), client=client)
+    assert c.complete("hello") == ""
+
+
+def test_none_message_returns_empty():
+    client = SimpleNamespace(
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(
+                create=lambda **kw: SimpleNamespace(
+                    choices=[SimpleNamespace(message=None)]
+                )
+            )
+        )
+    )
+    c = ChatClient(Config(base_url="https://x", api_key="k", model="m"), client=client)
+    assert c.complete("hello") == ""
