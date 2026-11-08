@@ -46,7 +46,7 @@ def test_auth_error_raises_chat_error():
     c = ChatClient(
         Config(base_url="https://x", api_key="k", model="m"), client=FakeClient(error=err)
     )
-    with pytest.raises(ChatError):
+    with pytest.raises(ChatError, match="认证失败"):
         c.complete("hello")
 
 
@@ -55,7 +55,7 @@ def test_network_error_raises_chat_error():
     c = ChatClient(
         Config(base_url="https://x", api_key="k", model="m"), client=FakeClient(error=err)
     )
-    with pytest.raises(ChatError):
+    with pytest.raises(ChatError, match="网络连接失败"):
         c.complete("hello")
 
 

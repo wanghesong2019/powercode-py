@@ -26,3 +26,29 @@ def test_main_prints_reply(capsys, monkeypatch):
 def test_main_without_prompt_prints_usage(capsys):
     assert cli.main([]) == 1
     assert "用法" in capsys.readouterr().err
+
+
+def test_main_config_error_prints_stderr(capsys, monkeypatch):
+    def boom(_path="provider.json"):
+        raise cli.ConfigError("找不到配置文件 provider.json")
+
+    monkeypatch.setattr(cli, "load_config", boom)
+    assert cli.main(["你好"]) == 1
+    err = capsys.readouterr().err
+    assert "错误" in err and "找不到配置文件" in err
+
+
+def test_main_chat_error_prints_stderr(capsys, monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "load_config",
+        lambda _path="provider.json": Config(base_url="x", api_key="k", model="m"),
+    )
+
+    def boom(config, client=None):
+        raise cli.ChatError("认证失败")
+
+    monkeypatch.setattr(cli, "ChatClient", boom)
+    assert cli.main(["你好"]) == 1
+    err = capsys.readouterr().err
+    assert "错误" in err and "认证失败" in err

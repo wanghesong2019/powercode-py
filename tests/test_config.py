@@ -18,21 +18,21 @@ def test_load_valid_config(tmp_path):
 
 
 def test_missing_file(tmp_path):
-    with pytest.raises(ConfigError):
+    with pytest.raises(ConfigError, match="找不到配置文件"):
         load_config(tmp_path / "nope.json")
 
 
 def test_malformed_json(tmp_path):
     p = tmp_path / "provider.json"
     p.write_text("{not json", encoding="utf-8")
-    with pytest.raises(ConfigError):
+    with pytest.raises(ConfigError, match="不是合法的 JSON"):
         load_config(p)
 
 
 def test_missing_field(tmp_path):
     p = tmp_path / "provider.json"
     p.write_text('{"baseURL":"x"}', encoding="utf-8")
-    with pytest.raises(ConfigError):
+    with pytest.raises(ConfigError, match="字段缺失或不是非空字符串"):
         load_config(p)
 
 
@@ -41,5 +41,5 @@ def test_non_string_value_raises_config_error(tmp_path):
     p.write_text(
         '{"baseURL":"https://x","apiKey":"k","model":123}', encoding="utf-8"
     )
-    with pytest.raises(ConfigError):
+    with pytest.raises(ConfigError, match="字段缺失或不是非空字符串"):
         load_config(p)
