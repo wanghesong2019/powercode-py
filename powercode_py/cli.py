@@ -1,18 +1,24 @@
-"""powercode 命令行入口：运行 Agent。"""
+"""powercode 命令行入口：注册工具并运行 Agent。"""
 
 import argparse
 import sys
+from pathlib import Path
 
 from .agent import Agent, AgentError
 from .chat import ChatClient, ChatError
 from .config import ConfigError, load_config
+from .tools.bash import BashTool
+from .tools.edit_file import EditFileTool
+from .tools.read_file import ReadFileTool
+from .tools.registry import Registry
+from .tools.write_file import WriteFileTool
 
 
 def main(argv: list[str] | None = None) -> int:
-    """CLI 入口：`powercode "你的问题"`，运行 Agent 循环后回答。"""
+    """CLI 入口：`powercode "你的问题"`，注册工具并运行 Agent。"""
     parser = argparse.ArgumentParser(
         prog="powercode",
-        description="从零手搓的 AI Agent：一问一答，支持读取项目文件。",
+        description="从零手搓的 AI Agent：一问一答，支持读、写、改文件与执行命令。",
     )
     parser.add_argument("prompt", nargs="?", help="要发给模型的问题")
     parser.add_argument(
@@ -28,7 +34,13 @@ def main(argv: list[str] | None = None) -> int:
     try:
         config = load_config(args.provider)
         client = ChatClient(config)
-        agent = Agent(client)
+        work_dir = Path.cwd().resolve()
+        registry = Registry()
+        registry.register(ReadFileTool(work_dir))
+        registry.register(WriteFileTool(work_dir))
+        registry.register(EditFileTool(work_dir))
+        registry.register(BashTool(work_dir))
+        agent = Agent(client, registry)
 
         print("AI 正在思考...\n")
         answer = agent.run(args.prompt)

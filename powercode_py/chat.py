@@ -4,7 +4,6 @@ import openai
 from openai import OpenAI
 
 from .config import Config
-from .read_file import READ_FILE_TOOL
 
 
 class ChatError(Exception):
@@ -40,12 +39,12 @@ class ChatClient:
         except openai.APIError as exc:
             raise ChatError(f"调用模型失败：{exc}") from exc
 
-    def complete(self, messages):
-        """把完整聊天记录发给模型，返回最新一条消息（可能带 tool_calls）。"""
+    def complete(self, messages, tools):
+        """把完整聊天记录和工具说明发给模型，返回最新一条消息。"""
         completion = self._create(
             model=self.config.model,
             messages=messages,
-            tools=[READ_FILE_TOOL],
+            tools=tools,
         )
         if not completion.choices:
             return None

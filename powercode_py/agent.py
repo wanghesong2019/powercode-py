@@ -1,12 +1,12 @@
-"""Agent：把模型、工具、消息历史串起来的核心循环。"""
+"""Agent：把模型、工具注册中心、消息历史串起来的核心循环。"""
 
 from .chat import ChatClient
-from .read_file import read_file_tool
+from .tools.registry import Registry
 
 MAX_STEPS = 8
 
 SYSTEM_PROMPT = (
-    "你是 powercode-py，一个研发助手。需要了解项目内容时，优先读取真实文件。请使用中文回答。"
+    "你是 powercode-py，一个研发助手。请优先读取真实文件；修改后主动运行构建或测试验证结果。请使用中文回答。"
 )
 
 
@@ -17,8 +17,9 @@ class AgentError(Exception):
 class Agent:
     """一个最小 Agent：循环调用模型，直到它不再申请工具。"""
 
-    def __init__(self, client: ChatClient):
+    def __init__(self, client: ChatClient, registry: Registry):
         self.client = client
+        self.registry = registry
 
     def _assistant_message(self, message) -> dict:
         """把模型返回的消息转成可回传的 assistant 消息 dict。"""
@@ -46,7 +47,7 @@ class Agent:
         ]
 
         for step in range(1, MAX_STEPS + 1):
-            message = self.client.complete(messages)
+            message = self.client.complete(messages, self.registry.get_definitions())
 
             if message is None:
                 raise AgentError("模型没有返回消息。")
@@ -61,16 +62,15 @@ class Agent:
                 if tool_call.type != "function":
                     raise AgentError(f"暂时不支持工具类型：{tool_call.type}")
 
-                if tool_call.function.name != "read_file":
-                    raise AgentError(f"暂时不支持工具：{tool_call.function.name}")
-
-                print(f"第 {step} 轮：AI 想调用 read_file")
-                print(f"正在读取文件：{tool_call.function.arguments}\n")
+                name = tool_call.function.name
+                print(f"第 {step} 轮：AI 调用 {name}")
 
                 try:
-                    result = read_file_tool(tool_call.function.arguments)
+                    result = self.registry.execute(name, tool_call.function.arguments)
+                    print(f"✓ {result}\n")
                 except Exception as exc:
-                    result = f"读取失败：{exc}"
+                    result = f"工具执行失败：{exc}"
+                    print(f"✗ {result}\n")
 
                 messages.append(
                     {
