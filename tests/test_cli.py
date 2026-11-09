@@ -22,16 +22,32 @@ def _config():
 def test_main_one_shot_prints_answer(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
-    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir: FakeAgent(answer="直接回答"))
+    monkeypatch.setattr(
+        cli, "_build_agent", lambda client, work_dir, state: FakeAgent(answer="直接回答")
+    )
     assert cli.main(["你好"]) == 0
     assert "直接回答" in capsys.readouterr().out
+
+
+def test_main_plan_flag(capsys, monkeypatch):
+    captured = {}
+    monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
+    monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
+
+    def fake_build(client, work_dir, state):
+        captured["mode"] = state.get_mode()
+        return FakeAgent(answer="hi")
+
+    monkeypatch.setattr(cli, "_build_agent", fake_build)
+    assert cli.main(["--plan", "你好"]) == 0
+    assert captured["mode"] == "plan"
 
 
 def test_main_no_prompt_enters_interactive(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
-    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir: FakeAgent())
-    monkeypatch.setattr(cli, "_interactive_loop", lambda agent: None)
+    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state: FakeAgent())
+    monkeypatch.setattr(cli, "_interactive_loop", lambda agent, state, work_dir: None)
     assert cli.main([]) == 0
 
 
@@ -48,10 +64,12 @@ def test_main_agent_error_prints_stderr(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
     monkeypatch.setattr(
-        cli, "_build_agent", lambda client, work_dir: FakeAgent(error=cli.AgentError("执行超过 8 轮"))
+        cli,
+        "_build_agent",
+        lambda client, work_dir, state: FakeAgent(error=cli.AgentError("执行超过 30 轮")),
     )
     assert cli.main(["你好"]) == 1
-    assert "执行超过 8 轮" in capsys.readouterr().err
+    assert "执行超过 30 轮" in capsys.readouterr().err
 
 
 def test_main_chat_error_prints_stderr(capsys, monkeypatch):
@@ -74,13 +92,12 @@ def test_main_forwards_provider_flag(capsys, monkeypatch):
 
     monkeypatch.setattr(cli, "load_config", fake_load)
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
-    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir: FakeAgent(answer="hi"))
+    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state: FakeAgent(answer="hi"))
     assert cli.main(["--provider", "custom.json", "你好"]) == 0
     assert captured["path"] == "custom.json"
 
 
-def test_interactive_loop_exits_on_quit(monkeypatch, capsys):
+def test_interactive_loop_exits_on_quit(monkeypatch):
     inputs = iter(["exit"])
     monkeypatch.setattr("builtins.input", lambda prompt="": next(inputs))
-    cli._interactive_loop(FakeAgent(answer="hi"))
-    # 无异常即通过
+    cli._interactive_loop(FakeAgent(answer="hi"), cli.AgentState(), ".")
