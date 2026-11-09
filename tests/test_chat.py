@@ -37,60 +37,24 @@ def _config():
     return Config(base_url="https://x", api_key="k", model="m")
 
 
-def _tool_call():
-    return SimpleNamespace(
-        id="call_1",
-        type="function",
-        function=SimpleNamespace(name="read_file", arguments='{"path":"README.md"}'),
-    )
-
-
-def test_ask_with_tools_returns_message_and_passes_tools():
-    msg = SimpleNamespace(content=None, tool_calls=[_tool_call()])
+def test_complete_passes_messages_and_tools():
+    msg = SimpleNamespace(content="回答", tool_calls=None)
     client = FakeClient(response=_completion(msg))
     c = ChatClient(_config(), client=client)
 
-    result = c.ask_with_tools("读一下 README")
+    messages = [{"role": "user", "content": "hi"}]
+    result = c.complete(messages)
 
     assert result is msg
     kwargs = client.calls[0]
+    assert kwargs["messages"] == messages
     assert kwargs["tools"] == [READ_FILE_TOOL]
-    assert kwargs["messages"][0]["role"] == "system"
-    assert kwargs["messages"][1] == {"role": "user", "content": "读一下 README"}
 
 
-def test_ask_with_tools_empty_choices_returns_none():
+def test_complete_empty_choices_returns_none():
     client = FakeClient(response=SimpleNamespace(choices=[]))
     c = ChatClient(_config(), client=client)
-    assert c.ask_with_tools("hi") is None
-
-
-def test_answer_after_read_file_returns_text():
-    client = FakeClient(response=_completion(content="这是一个从零手搓 AI Agent 的项目"))
-    c = ChatClient(_config(), client=client)
-
-    result = c.answer_after_read_file("这项目干嘛的", _tool_call(), "# powercode")
-
-    assert result == "这是一个从零手搓 AI Agent 的项目"
-    msgs = client.calls[0]["messages"]
-    assert msgs[2] == {
-        "role": "assistant",
-        "content": None,
-        "tool_calls": [
-            {
-                "id": "call_1",
-                "type": "function",
-                "function": {"name": "read_file", "arguments": '{"path":"README.md"}'},
-            }
-        ],
-    }
-    assert msgs[3] == {"role": "tool", "tool_call_id": "call_1", "content": "# powercode"}
-
-
-def test_answer_after_read_file_empty_returns_fallback():
-    client = FakeClient(response=_completion(content=None))
-    c = ChatClient(_config(), client=client)
-    assert c.answer_after_read_file("hi", _tool_call(), "x") == "模型没有返回内容。"
+    assert c.complete([{"role": "user", "content": "hi"}]) is None
 
 
 def test_auth_error_raises_chat_error():
@@ -100,21 +64,21 @@ def test_auth_error_raises_chat_error():
     err = openai.AuthenticationError("invalid api key", response=resp, body=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="认证失败"):
-        c.ask_with_tools("hello")
+        c.complete([{"role": "user", "content": "hi"}])
 
 
 def test_network_error_raises_chat_error():
     err = openai.APIConnectionError(request=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="网络连接失败"):
-        c.ask_with_tools("hello")
+        c.complete([])
 
 
 def test_timeout_error_mentions_timeout():
     err = openai.APITimeoutError(request=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="超时"):
-        c.ask_with_tools("hello")
+        c.complete([])
 
 
 def test_falsy_client_is_used():
@@ -131,4 +95,4 @@ def test_falsy_client_is_used():
             )
 
     c = ChatClient(_config(), client=FalsyClient())
-    assert c.ask_with_tools("hello").content == "from falsy"
+    assert c.complete([]).content == "from falsy"
