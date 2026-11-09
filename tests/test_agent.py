@@ -4,6 +4,7 @@ import pytest
 
 from powercode_py import agent
 from powercode_py.agent import Agent, AgentError
+from powercode_py.context.session import Session
 from powercode_py.tools.registry import Registry
 from powercode_py.tools.types import ToolError
 
@@ -33,6 +34,12 @@ class _FakeTool:
         return self._result
 
 
+class _Result:
+    def __init__(self, message, total_tokens):
+        self.message = message
+        self.total_tokens = total_tokens
+
+
 class ScriptedClient:
     """按顺序返回预设消息，记录每次传入的 (messages, tools)。"""
 
@@ -40,11 +47,14 @@ class ScriptedClient:
         self._responses = list(responses)
         self.calls = []
 
-    def complete(self, messages, tools):
+    def get_context_window(self):
+        return 128000
+
+    def complete_with_usage(self, messages, tools):
         self.calls.append((messages, tools))
         if not self._responses:
             raise AssertionError("脚本化的响应用完了")
-        return self._responses.pop(0)
+        return _Result(self._responses.pop(0), 1000)
 
 
 def _registry(tool):
@@ -55,7 +65,7 @@ def _registry(tool):
 
 def test_run_returns_answer_when_no_tool_call():
     client = ScriptedClient([_assistant(content="直接回答")])
-    a = Agent(client, Registry())
+    a = Agent(client, Registry(), Session())
     assert a.run("你好") == "直接回答"
 
 
@@ -67,7 +77,7 @@ def test_run_tool_then_answer():
             _assistant(content="这是答案"),
         ]
     )
-    a = Agent(client, reg)
+    a = Agent(client, reg, Session())
 
     result = a.run("这个项目是做什么的？")
 
@@ -95,7 +105,7 @@ def test_run_handles_multiple_tool_calls_in_one_round():
             _assistant(content="读完了"),
         ]
     )
-    a = Agent(client, reg)
+    a = Agent(client, reg, Session())
     result = a.run("读两个文件")
     assert result == "读完了"
     msgs = client.calls[1][0]
@@ -111,7 +121,7 @@ def test_run_feeds_back_tool_failure():
             _assistant(content="文件找不到"),
         ]
     )
-    a = Agent(client, reg)
+    a = Agent(client, reg, Session())
     result = a.run("读个不存在的文件")
     assert result == "文件找不到"
     msgs = client.calls[1][0]
@@ -126,7 +136,7 @@ def test_run_feeds_back_unknown_tool():
             _assistant(content="没这个工具"),
         ]
     )
-    a = Agent(client, Registry())
+    a = Agent(client, Registry(), Session())
     result = a.run("hi")
     assert result == "没这个工具"
     msgs = client.calls[1][0]
@@ -135,7 +145,7 @@ def test_run_feeds_back_unknown_tool():
 
 def test_run_raises_when_model_returns_none():
     client = ScriptedClient([None])
-    a = Agent(client, Registry())
+    a = Agent(client, Registry(), Session())
     with pytest.raises(AgentError, match="模型没有返回消息"):
         a.run("你好")
 
@@ -147,7 +157,7 @@ def test_run_raises_on_unsupported_tool_type():
         function=SimpleNamespace(name="read_file", arguments="{}"),
     )
     client = ScriptedClient([_assistant(content=None, tool_calls=[bad])])
-    a = Agent(client, Registry())
+    a = Agent(client, Registry(), Session())
     with pytest.raises(AgentError, match="工具类型"):
         a.run("你好")
 
@@ -156,6 +166,6 @@ def test_run_raises_when_max_steps_exceeded():
     reg = _registry(_FakeTool("read_file", result="内容"))
     always_tool = _assistant(content=None, tool_calls=[_tool_call()])
     client = ScriptedClient([always_tool] * agent.MAX_STEPS)
-    a = Agent(client, reg)
+    a = Agent(client, reg, Session())
     with pytest.raises(AgentError, match="超过"):
         a.run("你好")

@@ -1,5 +1,7 @@
 """封装 OpenAI 兼容 SDK，提供单次模型请求能力。"""
 
+from dataclasses import dataclass
+
 import openai
 from openai import OpenAI
 
@@ -8,6 +10,14 @@ from .config import Config
 
 class ChatError(Exception):
     """调用模型失败。"""
+
+
+@dataclass
+class CompletionResult:
+    """一次模型请求的结果：回复消息 + 真实 Token 用量。"""
+
+    message: object
+    total_tokens: int | None
 
 
 class ChatClient:
@@ -24,6 +34,10 @@ class ChatClient:
             timeout=timeout,
         )
 
+    def get_context_window(self) -> int:
+        """返回模型的上下文窗口上限。"""
+        return self.config.context_window
+
     def _create(self, **kwargs):
         """调用 chat.completions.create，并把 SDK 异常翻译成 ChatError。"""
         try:
@@ -39,13 +53,14 @@ class ChatClient:
         except openai.APIError as exc:
             raise ChatError(f"调用模型失败：{exc}") from exc
 
-    def complete(self, messages, tools):
-        """把完整聊天记录和工具说明发给模型，返回最新一条消息。"""
+    def complete_with_usage(self, messages, tools) -> CompletionResult:
+        """把完整聊天记录和工具说明发给模型，返回消息与 Token 用量。"""
         completion = self._create(
             model=self.config.model,
             messages=messages,
             tools=tools,
         )
-        if not completion.choices:
-            return None
-        return completion.choices[0].message
+        message = completion.choices[0].message if completion.choices else None
+        usage = getattr(completion, "usage", None)
+        total_tokens = usage.total_tokens if usage is not None else None
+        return CompletionResult(message=message, total_tokens=total_tokens)

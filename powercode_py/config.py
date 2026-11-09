@@ -16,6 +16,7 @@ class Config:
     base_url: str
     api_key: str
     model: str
+    context_window: int
 
 
 DEFAULT_FILENAME = "provider.json"
@@ -54,10 +55,15 @@ def _load(path: Path) -> Config:
             f"配置文件 {path} 的字段缺失或不是非空字符串：{', '.join(invalid)}"
         )
 
+    context_window = raw.get("contextWindow")
+    if not isinstance(context_window, int) or context_window <= 0:
+        raise ConfigError(f"配置文件 {path} 的 contextWindow 必须是正整数。")
+
     return Config(
         base_url=raw["baseURL"].strip(),
         api_key=raw["apiKey"].strip(),
         model=raw["model"].strip(),
+        context_window=context_window,
     )
 
 

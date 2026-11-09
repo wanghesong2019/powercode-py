@@ -8,14 +8,15 @@ from powercode_py.config import ConfigError, load_config
 def test_load_valid_config(tmp_path):
     p = tmp_path / "provider.json"
     p.write_text(
-        '{"baseURL":"https://api.deepseek.com","apiKey":"sk-test","model":"deepseek-v4-flash"}',
+        '{"baseURL":"https://api.deepseek.com","apiKey":"sk-test","model":"deepseek-v4-flash","contextWindow":128000}',
         encoding="utf-8",
     )
     c = load_config(p)
-    assert (c.base_url, c.api_key, c.model) == (
+    assert (c.base_url, c.api_key, c.model, c.context_window) == (
         "https://api.deepseek.com",
         "sk-test",
         "deepseek-v4-flash",
+        128000,
     )
 
 
@@ -50,7 +51,7 @@ def test_non_string_value_raises_config_error(tmp_path):
 def _write_provider(dirpath, model="deepseek-v4-flash"):
     p = dirpath / "provider.json"
     p.write_text(
-        f'{{"baseURL":"https://api.deepseek.com","apiKey":"sk-test","model":"{model}"}}',
+        f'{{"baseURL":"https://api.deepseek.com","apiKey":"sk-test","model":"{model}","contextWindow":128000}}',
         encoding="utf-8",
     )
     return p
@@ -104,3 +105,20 @@ def test_no_config_anywhere_lists_search_paths(tmp_path, monkeypatch):
     msg = str(excinfo.value)
     assert "provider.json" in msg
     assert ".powercode" in msg
+
+
+def test_missing_context_window(tmp_path):
+    p = tmp_path / "provider.json"
+    p.write_text('{"baseURL":"https://x","apiKey":"k","model":"m"}', encoding="utf-8")
+    with pytest.raises(ConfigError, match="contextWindow"):
+        load_config(p)
+
+
+def test_context_window_must_be_positive_int(tmp_path):
+    p = tmp_path / "provider.json"
+    p.write_text(
+        '{"baseURL":"https://x","apiKey":"k","model":"m","contextWindow":-1}',
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="contextWindow"):
+        load_config(p)

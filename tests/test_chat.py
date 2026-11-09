@@ -3,14 +3,15 @@ from types import SimpleNamespace
 import openai
 import pytest
 
-from powercode_py.chat import ChatClient, ChatError
+from powercode_py.chat import ChatClient, ChatError, CompletionResult
 from powercode_py.config import Config
 
 
-def _completion(message=None, content=None):
+def _completion(message=None, content=None, total_tokens=None):
     if message is None:
         message = SimpleNamespace(content=content)
-    return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+    usage = SimpleNamespace(total_tokens=total_tokens) if total_tokens is not None else None
+    return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=usage)
 
 
 class FakeClient:
@@ -33,30 +34,39 @@ class FakeClient:
 
 
 def _config():
-    return Config(base_url="https://x", api_key="k", model="m")
+    return Config(base_url="https://x", api_key="k", model="m", context_window=128000)
 
 
 TOOLS = [{"type": "function", "function": {"name": "read_file"}}]
 
 
-def test_complete_passes_messages_and_tools():
+def test_complete_with_usage_returns_message_and_tokens():
     msg = SimpleNamespace(content="回答", tool_calls=None)
-    client = FakeClient(response=_completion(msg))
+    client = FakeClient(response=_completion(msg, total_tokens=321))
     c = ChatClient(_config(), client=client)
 
     messages = [{"role": "user", "content": "hi"}]
-    result = c.complete(messages, TOOLS)
+    result = c.complete_with_usage(messages, TOOLS)
 
-    assert result is msg
+    assert isinstance(result, CompletionResult)
+    assert result.message is msg
+    assert result.total_tokens == 321
     kwargs = client.calls[0]
     assert kwargs["messages"] == messages
     assert kwargs["tools"] == TOOLS
 
 
-def test_complete_empty_choices_returns_none():
-    client = FakeClient(response=SimpleNamespace(choices=[]))
+def test_complete_with_usage_empty_choices():
+    client = FakeClient(response=SimpleNamespace(choices=[], usage=None))
     c = ChatClient(_config(), client=client)
-    assert c.complete([{"role": "user", "content": "hi"}], TOOLS) is None
+    result = c.complete_with_usage([], TOOLS)
+    assert result.message is None
+    assert result.total_tokens is None
+
+
+def test_get_context_window():
+    c = ChatClient(_config())
+    assert c.get_context_window() == 128000
 
 
 def test_auth_error_raises_chat_error():
@@ -66,21 +76,21 @@ def test_auth_error_raises_chat_error():
     err = openai.AuthenticationError("invalid api key", response=resp, body=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="认证失败"):
-        c.complete([{"role": "user", "content": "hi"}], TOOLS)
+        c.complete_with_usage([], TOOLS)
 
 
 def test_network_error_raises_chat_error():
     err = openai.APIConnectionError(request=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="网络连接失败"):
-        c.complete([], TOOLS)
+        c.complete_with_usage([], TOOLS)
 
 
 def test_timeout_error_mentions_timeout():
     err = openai.APITimeoutError(request=None)
     c = ChatClient(_config(), client=FakeClient(error=err))
     with pytest.raises(ChatError, match="超时"):
-        c.complete([], TOOLS)
+        c.complete_with_usage([], TOOLS)
 
 
 def test_falsy_client_is_used():
@@ -97,4 +107,4 @@ def test_falsy_client_is_used():
             )
 
     c = ChatClient(_config(), client=FalsyClient())
-    assert c.complete([], TOOLS).content == "from falsy"
+    assert c.complete_with_usage([], TOOLS).message.content == "from falsy"

@@ -1,5 +1,6 @@
 {
   "baseURL": "https://api.deepseek.com",
   "apiKey": "你的 API Key",
-  "model": "deepseek-v4-flash"
+  "model": "deepseek-v4-flash",
+  "contextWindow": 128000
 }
