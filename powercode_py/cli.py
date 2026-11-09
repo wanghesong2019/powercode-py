@@ -14,6 +14,10 @@ def main(argv: list[str] | None = None) -> int:
         description="从零手搓的 AI Agent：一问一答。",
     )
     parser.add_argument("prompt", nargs="?", help="要发给模型的问题")
+    parser.add_argument(
+        "--provider",
+        help="指定 provider.json 路径（默认按当前目录 → ~/.powercode/ 查找）",
+    )
     args = parser.parse_args(argv)
 
     if not args.prompt:
@@ -21,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        config = load_config()
+        config = load_config(args.provider)
         reply = ChatClient(config).complete(args.prompt)
     except (ConfigError, ChatError) as exc:
         print(f"错误：{exc}", file=sys.stderr)

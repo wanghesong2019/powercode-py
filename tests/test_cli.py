@@ -52,3 +52,16 @@ def test_main_chat_error_prints_stderr(capsys, monkeypatch):
     assert cli.main(["你好"]) == 1
     err = capsys.readouterr().err
     assert "错误" in err and "认证失败" in err
+
+
+def test_main_forwards_provider_flag(capsys, monkeypatch):
+    captured = {}
+
+    def fake_load(path=None):
+        captured["path"] = path
+        return Config(base_url="x", api_key="k", model="m")
+
+    monkeypatch.setattr(cli, "load_config", fake_load)
+    monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: FakeChat("回复"))
+    assert cli.main(["--provider", "custom.json", "你好"]) == 0
+    assert captured["path"] == "custom.json"
