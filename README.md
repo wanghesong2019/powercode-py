@@ -25,12 +25,24 @@ pip install -e .
 
 ## 快速开始
 
-1. 复制配置模板，填入你自己的 API Key：
+1. 准备配置（二选一）：
+
+**方式一：放在当前目录**（在项目根目录执行）
 
 ```bash
 cp provider.json.example provider.json
-# 编辑 provider.json，填入 baseURL / apiKey / model
 ```
+
+**方式二：放在用户目录**，这样在任何目录都能运行
+
+```bash
+# Linux / macOS
+mkdir -p ~/.powercode && cp provider.json.example ~/.powercode/provider.json
+# Windows PowerShell
+mkdir $HOME\.powercode; copy provider.json.example $HOME\.powercode\provider.json
+```
+
+然后编辑配置文件，填入你自己的 `baseURL` / `apiKey` / `model`。
 
 2. 运行：
 
@@ -39,3 +51,5 @@ powercode "用一句话解释什么是 Python"
 ```
 
 它会打印出模型的中文回答。
+
+> `provider.json` 的查找顺序是「当前目录 → `~/.powercode/`」；也可以用 `--provider 路径` 显式指定。
