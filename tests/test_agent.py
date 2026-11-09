@@ -10,6 +10,7 @@ from powercode_py.plan import AgentState
 from powercode_py.tools.registry import Registry
 from powercode_py.tools.submit_plan import SubmitPlanTool
 from powercode_py.tools.types import ToolError
+from powercode_py.context.recovery import ToolExecutionError
 
 
 def _assistant(content=None, tool_calls=None):
@@ -163,17 +164,15 @@ def test_run_feeds_back_tool_failure():
     assert msgs[3]["content"].startswith("工具执行失败")
 
 
-def test_run_feeds_back_disallowed_tool():
+def test_run_stops_on_disallowed_tool():
     client = ScriptedClient(
-        [
-            _assistant(content=None, tool_calls=[_tool_call(name="nope")]),
-            _assistant(content="没这个工具"),
-        ]
+        [_assistant(content=None, tool_calls=[_tool_call(name="nope")])]
     )
     a = _agent(client, Registry())
     result = a.run("hi")
-    assert result == "没这个工具"
-    assert "不允许调用" in client.calls[1][0][3]["content"]
+    assert result.startswith("本次运行已暂停")
+    assert "不允许调用" in result
+    assert len(client.calls) == 1
 
 
 def test_run_raises_when_model_returns_none():
@@ -200,3 +199,13 @@ def test_run_raises_when_max_steps_exceeded():
     a = _agent(client, reg)
     with pytest.raises(AgentError, match="超过"):
         a.run("你好")
+
+
+def test_run_stops_on_permission_failure():
+    reg = _registry(_FakeTool("bash", error=ToolExecutionError("permission", "越界")))
+    client = ScriptedClient(
+        [_assistant(content=None, tool_calls=[_tool_call(name="bash", arguments='{"command":"rm"}')])]
+    )
+    a = _agent(client, reg)
+    result = a.run("删点东西")
+    assert result.startswith("本次运行已暂停")

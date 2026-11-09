@@ -3,6 +3,7 @@
 import json
 import subprocess
 
+from ..context.recovery import ToolExecutionError
 from .types import ToolError
 
 TIMEOUT_SECONDS = 30
@@ -68,16 +69,16 @@ class BashTool:
         except subprocess.TimeoutExpired as exc:
             output = _truncate(_format_output(exc.stdout or "", exc.stderr or ""))
             if output:
-                raise ToolError(f"命令执行超时：{command}\n\n{output}") from exc
-            raise ToolError(f"命令执行超时：{command}") from exc
+                raise ToolExecutionError("timeout", f"命令执行超时：{command}\n\n{output}") from exc
+            raise ToolExecutionError("timeout", f"命令执行超时：{command}") from exc
 
         if proc.returncode != 0:
             output = _truncate(_format_output(proc.stdout, proc.stderr))
             if output:
-                raise ToolError(
-                    f"命令执行失败（退出码 {proc.returncode}）\n\n{output}"
+                raise ToolExecutionError(
+                    "command_failed", f"命令执行失败（退出码 {proc.returncode}）\n\n{output}"
                 )
-            raise ToolError(f"命令执行失败（退出码 {proc.returncode}）")
+            raise ToolExecutionError("command_failed", f"命令执行失败（退出码 {proc.returncode}）")
 
         output = _truncate(_format_output(proc.stdout, proc.stderr))
         return output or "命令执行成功，没有终端输出。"

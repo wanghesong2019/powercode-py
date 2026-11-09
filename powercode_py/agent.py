@@ -2,15 +2,20 @@
 
 from .chat import ChatClient
 from .context.compactor import Compactor
+from .context.recovery import RecoveryManager
 from .context.session import Session
 from .plan import AgentState, format_plan
 from .tools.registry import Registry
+from .tools.tool_runner import run_tool_batch
 
 MAX_STEPS = 30
 
 CORE_SYSTEM_PROMPT = """你是 powercode-py，一个研发助手。
 请优先读取真实文件；修改后主动运行命令验证结果；请使用中文回答。
 所有文件路径都相对于当前工作目录，不能操作工作目录之外的文件。
+工具失败后，结合原始日志和 Harness 恢复提示调整策略。
+超时、输出溢出或写入报错后，先检查进程和文件现状，不能假定操作完全没有生效。
+验证未通过时，不得把对应 TODO 标为完成；不能通过删除测试或绕过权限消除报错。
 """
 
 PLAN_MODE_PROMPT = """
@@ -104,6 +109,9 @@ class Agent:
 
         self.session.append({"role": "user", "content": prompt})
 
+        # 每次 run 使用独立计数；上下文压缩不会清空本次计数。
+        recovery = RecoveryManager()
+
         for step in range(1, MAX_STEPS + 1):
             memory = self.compactor.build_working_memory(self.session)
             allowed = self._allowed_tool_names()
@@ -121,40 +129,27 @@ class Agent:
             if message is None:
                 raise AgentError("模型没有返回消息。")
 
+            tool_calls = getattr(message, "tool_calls", None) or []
+            for call in tool_calls:
+                if call.type != "function":
+                    raise AgentError(f"暂时不支持工具类型：{call.type}")
+
             self.session.append(self._assistant_message(message))
 
             if completion.total_tokens is not None and completion.total_tokens > 0:
                 self.session.save_usage(completion.total_tokens)
 
-            tool_calls = getattr(message, "tool_calls", None) or []
             if not tool_calls:
                 self.state.finish_execution()
                 return message.content or "模型没有返回文本内容。"
 
-            for tool_call in tool_calls:
-                if tool_call.type != "function":
-                    raise AgentError(f"暂时不支持工具类型：{tool_call.type}")
+            batch = run_tool_batch(tool_calls, self.registry, allowed, recovery)
+            self.session.append(*batch["messages"])
 
-                name = tool_call.function.name
-                print(f"第 {step} 轮：AI 调用 {name}")
-
-                try:
-                    result = self.registry.execute(
-                        name,
-                        tool_call.function.arguments,
-                        allowed,
-                    )
-                    print(f"✓ {name} 执行完成\n")
-                except Exception as exc:
-                    result = f"工具执行失败：{exc}"
-                    print(f"✗ {result}\n")
-
-                self.session.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call.id,
-                        "content": result,
-                    }
+            if batch["stop"]:
+                return (
+                    f"本次运行已暂停。\n{batch['stop_reason']}\n"
+                    "请检查当前文件和未完成 TODO 后再继续。"
                 )
 
             if self.state.get_status() == "waiting_for_approval":

@@ -4,8 +4,10 @@ import hashlib
 import json
 from dataclasses import dataclass
 
+from ..tools.types import ToolError
 
-class ToolExecutionError(Exception):
+
+class ToolExecutionError(ToolError):
     """带失败类型（kind）的工具执行错误。"""
 
     def __init__(self, kind: str, message: str):
