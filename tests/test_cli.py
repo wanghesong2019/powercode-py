@@ -23,7 +23,7 @@ def test_main_one_shot_prints_answer(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
     monkeypatch.setattr(
-        cli, "_build_agent", lambda client, work_dir, state: FakeAgent(answer="直接回答")
+        cli, "_build_agent", lambda client, work_dir, state, engine="handmade": FakeAgent(answer="直接回答")
     )
     assert cli.main(["你好"]) == 0
     assert "直接回答" in capsys.readouterr().out
@@ -34,7 +34,7 @@ def test_main_plan_flag(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
 
-    def fake_build(client, work_dir, state):
+    def fake_build(client, work_dir, state, engine="handmade"):
         captured["mode"] = state.get_mode()
         return FakeAgent(answer="hi")
 
@@ -46,7 +46,7 @@ def test_main_plan_flag(capsys, monkeypatch):
 def test_main_no_prompt_enters_interactive(capsys, monkeypatch):
     monkeypatch.setattr(cli, "load_config", lambda _path=None: _config())
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
-    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state: FakeAgent())
+    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state, engine="handmade": FakeAgent())
     monkeypatch.setattr(cli, "_interactive_loop", lambda agent, state, work_dir: None)
     assert cli.main([]) == 0
 
@@ -66,7 +66,7 @@ def test_main_agent_error_prints_stderr(capsys, monkeypatch):
     monkeypatch.setattr(
         cli,
         "_build_agent",
-        lambda client, work_dir, state: FakeAgent(error=cli.AgentError("执行超过 30 轮")),
+        lambda client, work_dir, state, engine="handmade": FakeAgent(error=cli.AgentError("执行超过 30 轮")),
     )
     assert cli.main(["你好"]) == 1
     assert "执行超过 30 轮" in capsys.readouterr().err
@@ -92,7 +92,7 @@ def test_main_forwards_provider_flag(capsys, monkeypatch):
 
     monkeypatch.setattr(cli, "load_config", fake_load)
     monkeypatch.setattr(cli, "ChatClient", lambda config, client=None: object())
-    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state: FakeAgent(answer="hi"))
+    monkeypatch.setattr(cli, "_build_agent", lambda client, work_dir, state, engine="handmade": FakeAgent(answer="hi"))
     assert cli.main(["--provider", "custom.json", "你好"]) == 0
     assert captured["path"] == "custom.json"
 

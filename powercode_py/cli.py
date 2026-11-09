@@ -20,7 +20,7 @@ from .tools.submit_plan import SubmitPlanTool
 from .tools.write_file import WriteFileTool
 
 
-def _build_agent(client, work_dir, state):
+def _build_agent(client, work_dir, state, engine="handmade"):
     """注册全部工具并创建一个带会话与状态的 Agent。"""
     registry = Registry()
     registry.register(ReadFileTool(work_dir))
@@ -31,6 +31,12 @@ def _build_agent(client, work_dir, state):
     registry.register(BashTool(work_dir))
     registry.register(SubmitPlanTool(state))
     session = Session()
+    if engine == "langgraph":
+        try:
+            from .graph.agent import LangGraphAgent
+        except ImportError as exc:
+            raise ConfigError("要使用 --engine langgraph 请先安装：pip install -e '.[graph]'") from exc
+        return LangGraphAgent(client, registry, session, state)
     return Agent(client, registry, session, state)
 
 
@@ -124,6 +130,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--plan", action="store_true", help="启动后直接进入 Plan Mode")
     parser.add_argument("--dir", default=".", help="Agent 操作的工作目录（默认当前目录）")
+    parser.add_argument(
+        "--engine",
+        choices=["handmade", "langgraph"],
+        default="handmade",
+        help="Agent 引擎（默认 handmade 手搓版）",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -131,7 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         client = ChatClient(config)
         work_dir = Path(args.dir).resolve()
         state = AgentState("plan" if args.plan else "code")
-        agent = _build_agent(client, work_dir, state)
+        agent = _build_agent(client, work_dir, state, args.engine)
     except (ConfigError, ChatError) as exc:
         print(f"错误：{exc}", file=sys.stderr)
         return 1

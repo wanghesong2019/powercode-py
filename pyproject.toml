@@ -12,6 +12,9 @@ dependencies = [
 dev = [
     "pytest>=8",
 ]
+graph = [
+    "langgraph>=1.0",
+]
 
 [project.scripts]
 powercode = "powercode_py.cli:main"
