@@ -10,8 +10,32 @@
 
 ## 安装
 
-（待补充）
+需要 Python 3.10+。
+
+```bash
+uv venv
+uv pip install -e .
+```
+
+不用 uv 的话，也可以直接用 pip：
+
+```bash
+pip install -e .
+```
 
 ## 快速开始
 
-（待补充）
+1. 复制配置模板，填入你自己的 API Key：
+
+```bash
+cp provider.json.example provider.json
+# 编辑 provider.json，填入 baseURL / apiKey / model
+```
+
+2. 运行：
+
+```bash
+powercode "用一句话解释什么是 Python"
+```
+
+它会打印出模型的中文回答。
