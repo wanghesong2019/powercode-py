@@ -15,12 +15,18 @@ class Registry:
             raise ToolError(f"工具重复注册：{tool.name}")
         self._tools[tool.name] = tool
 
-    def get_definitions(self) -> list[dict]:
-        """返回所有工具的 definition（给模型看的工具说明）。"""
-        return [tool.definition for tool in self._tools.values()]
+    def get_definitions(self, allowed_names=None) -> list[dict]:
+        """返回工具说明；传 allowed_names 时只返回允许的工具。"""
+        return [
+            tool.definition
+            for tool in self._tools.values()
+            if allowed_names is None or tool.name in allowed_names
+        ]
 
-    def execute(self, name: str, arguments_json: str) -> str:
-        """根据工具名找到工具并执行。"""
+    def execute(self, name: str, arguments_json: str, allowed_names=None) -> str:
+        """根据工具名找到工具并执行；传 allowed_names 时先做权限拦截。"""
+        if allowed_names is not None and name not in allowed_names:
+            raise ToolError(f"当前模式不允许调用工具：{name}")
         tool = self._tools.get(name)
         if tool is None:
             raise ToolError(f"找不到工具：{name}")

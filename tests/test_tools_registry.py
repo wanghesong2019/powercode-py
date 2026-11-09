@@ -43,3 +43,19 @@ def test_execute_unknown_tool_raises():
     r = Registry()
     with pytest.raises(ToolError, match="找不到工具"):
         r.execute("nope", "{}")
+
+
+def test_get_definitions_filters_by_allowed():
+    r = Registry()
+    r.register(_FakeTool("read_file"))
+    r.register(_FakeTool("write_file"))
+    assert r.get_definitions({"read_file"}) == [
+        {"type": "function", "function": {"name": "read_file"}}
+    ]
+
+
+def test_execute_rejects_disallowed():
+    r = Registry()
+    r.register(_FakeTool("write_file"))
+    with pytest.raises(ToolError, match="不允许调用"):
+        r.execute("write_file", "{}", {"read_file"})
