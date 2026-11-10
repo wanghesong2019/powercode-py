@@ -55,6 +55,10 @@ class LangGraphAgent:
 
     def _assistant_message(self, message) -> dict:
         msg = {"role": "assistant", "content": message.content}
+        # DeepSeek thinking mode：reasoning_content 必须在多轮里原样传回，否则 400
+        reasoning = getattr(message, "reasoning_content", None)
+        if reasoning:
+            msg["reasoning_content"] = reasoning
         tool_calls = self._tool_calls_dicts(message)
         if tool_calls:
             msg["tool_calls"] = tool_calls

@@ -76,6 +76,10 @@ class Agent:
     def _assistant_message(self, message) -> dict:
         """把模型返回的消息转成可回传的 assistant 消息 dict。"""
         msg = {"role": "assistant", "content": message.content}
+        # DeepSeek thinking mode：reasoning_content 必须在多轮里原样传回，否则 400
+        reasoning = getattr(message, "reasoning_content", None)
+        if reasoning:
+            msg["reasoning_content"] = reasoning
         tool_calls = getattr(message, "tool_calls", None) or []
         if tool_calls:
             msg["tool_calls"] = [

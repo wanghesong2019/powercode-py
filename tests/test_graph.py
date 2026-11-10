@@ -96,3 +96,23 @@ def test_langgraph_submit_plan_interrupts():
     # interrupt 后 run 返回计划文本
     assert result.startswith("# 重构登录")
     assert state.get_status() == "waiting_for_approval"
+
+
+def test_langgraph_passes_back_reasoning_content():
+    # DeepSeek thinking mode：reasoning_content 必须在多轮里原样传回
+    client = ScriptedClient(
+        [
+            SimpleNamespace(
+                content=None,
+                reasoning_content="想想……",
+                tool_calls=[_tool_call("read_file", '{"path":"README.md"}')],
+            ),
+            _assistant(content="这是答案"),
+        ]
+    )
+    registry = Registry()
+    registry.register(_FakeTool("read_file", result="# 内容"))
+    agent = LangGraphAgent(client, registry, Session(), AgentState())
+    agent.run("读一下")
+    msgs = client.calls[1][0]
+    assert msgs[2]["reasoning_content"] == "想想……"

@@ -209,3 +209,18 @@ def test_run_stops_on_permission_failure():
     a = _agent(client, reg)
     result = a.run("删点东西")
     assert result.startswith("本次运行已暂停")
+
+
+def test_run_passes_back_reasoning_content():
+    # DeepSeek thinking mode 会给 assistant 消息带 reasoning_content，多轮里必须原样传回
+    reg = _registry(_FakeTool("read_file", result="内容"))
+    thinking = SimpleNamespace(
+        content=None,
+        reasoning_content="让我先想想……",
+        tool_calls=[_tool_call()],
+    )
+    client = ScriptedClient([thinking, _assistant(content="这是答案")])
+    a = _agent(client, reg)
+    a.run("读一下")
+    msgs = client.calls[1][0]
+    assert msgs[2]["reasoning_content"] == "让我先想想……"
