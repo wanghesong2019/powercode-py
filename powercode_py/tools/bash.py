@@ -1,6 +1,7 @@
 """在项目目录内执行终端命令的工具。"""
 
 import json
+import locale
 import subprocess
 
 from ..context.recovery import ToolExecutionError
@@ -19,6 +20,24 @@ def _parse_command(arguments_json: str) -> str:
     if not isinstance(command, str) or not command.strip():
         raise ToolError("command 必须是非空字符串。")
     return command.strip()
+
+
+def _decode_bytes(data: bytes) -> str:
+    """解码命令输出字节，兼容 Windows GBK 与 UTF-8 两种输出。
+
+    Windows 下 cmd 默认按系统代码页（中文是 GBK）输出，而 git、python 等程序常
+    输出 UTF-8；固定一种编码会撞上另一种，直接抛 UnicodeDecodeError。这里先按
+    UTF-8 严格解码（能通过就基本是 UTF-8），失败再退回系统默认编码，再试 GBK，
+    最后用 replace 兜底——保证任何输出都不会把整条命令搞崩。
+    """
+    if not data:
+        return ""
+    for encoding in ("utf-8", locale.getpreferredencoding(False), "gbk"):
+        try:
+            return data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    return data.decode("utf-8", errors="replace")
 
 
 def _format_output(stdout: str, stderr: str) -> str:
@@ -63,22 +82,26 @@ class BashTool:
                 shell=True,
                 cwd=str(self.work_dir),
                 capture_output=True,
-                text=True,
                 timeout=TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired as exc:
-            output = _truncate(_format_output(exc.stdout or "", exc.stderr or ""))
+            stdout = _decode_bytes(exc.stdout or b"")
+            stderr = _decode_bytes(exc.stderr or b"")
+            output = _truncate(_format_output(stdout, stderr))
             if output:
                 raise ToolExecutionError("timeout", f"命令执行超时：{command}\n\n{output}") from exc
             raise ToolExecutionError("timeout", f"命令执行超时：{command}") from exc
 
+        stdout = _decode_bytes(proc.stdout)
+        stderr = _decode_bytes(proc.stderr)
+
         if proc.returncode != 0:
-            output = _truncate(_format_output(proc.stdout, proc.stderr))
+            output = _truncate(_format_output(stdout, stderr))
             if output:
                 raise ToolExecutionError(
                     "command_failed", f"命令执行失败（退出码 {proc.returncode}）\n\n{output}"
                 )
             raise ToolExecutionError("command_failed", f"命令执行失败（退出码 {proc.returncode}）")
 
-        output = _truncate(_format_output(proc.stdout, proc.stderr))
+        output = _truncate(_format_output(stdout, stderr))
         return output or "命令执行成功，没有终端输出。"
