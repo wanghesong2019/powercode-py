@@ -4,6 +4,14 @@
 
 > 灵感与参考：[不用框架，手搓 AI Agent](https://juejin.cn/column/7661531339729829926)（作者：不一样的少年_ / GitHub: [Teernage/powercode](https://github.com/Teernage/powercode)）。本项目用纯 Python 重写并在原基础上补齐了 Plan Mode、错误自救与熔断、LangGraph 封装等模块。
 
+## 🎬 效果演示
+
+交互式多轮对话 + 工具调用：
+
+<p align="center"><img src="docs/demo.gif" alt="powercode-py 交互演示" /></p>
+
+> 上图演示：`powercode` 进入交互模式 → 提问 → 模型调用 `read_file` 读取 README → 给出回答。
+
 ## ✨ 功能
 
 - 在终端中与 AI 模型对话（交互式多轮对话）
@@ -110,6 +118,20 @@ powercode --engine langgraph "读一下 README.md，一句话说这个项目是�
 | `--plan` | 启动后直接进入 Plan Mode |
 | `--dir 目录` | Agent 操作的工作目录（默认当前目录） |
 | `--engine {handmade,langgraph}` | 选择引擎（默认 handmade 手搓版） |
+
+## 🎯 通过本项目你能学到
+
+从零手搓一个 Agent，你会真正吃透这些点：
+
+- **Function Calling**：怎么给模型"装工具"，让它自己决定调用 `read_file` / `write_file` / `bash`
+- **Agent Loop**：模型决策 → 程序执行 → 结果回传的循环，以及它和"终端交互循环"的区别
+- **工具注册中心**：用统一协议（`name` / `definition` / `execute`）管理工具，扩展新工具不用改循环
+- **会话记忆与上下文压缩**：`Session` 存历史、`Compactor` 生成"摘要 + 近期原文"的工作记忆，真实 token 用量估算
+- **Plan Mode**：用状态机（`mode` / `status`）实现"只读 → 审批 → 执行"的权限边界，计划落盘 `PLAN.md` / `TODO.md`
+- **错误自救与熔断**：失败分类、恢复提示、重复失败计数与熔断
+- **LangGraph 封装**：用 `StateGraph` 重写同一套 Agent Loop
+
+每条对应一个可运行的 commit，`git log --oneline` 顺着做就行（详见下方「学习路径」）。
 
 ## 📖 学习路径
 
